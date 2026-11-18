@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Home — Visualisasi 3D Keseluruhan Lahan</title>
+  <link rel="icon" href="data:," />
+  <style>
+    :root{--ink:#f5f1e7;--muted:#c6c8bd;--panel:rgba(21,27,23,.92);--line:rgba(255,255,255,.14);--accent:#eeb84c;--green:#91bf73;--blue:#75bad0}
+    *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#b9d8e9}body{font-family:"Segoe UI",Arial,sans-serif;color:var(--ink)}
+    canvas{display:block;width:100%;height:100%;outline:none}button{font:inherit}
+    .panel{position:fixed;z-index:10;background:var(--panel);border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.24);backdrop-filter:blur(8px)}
+    #info{top:16px;left:16px;width:min(355px,calc(100vw - 32px));padding:16px;border-radius:8px}
+    .eyebrow{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+    h1{font-family:Georgia,serif;font-size:22px;line-height:1.12;margin:5px 0 11px;font-weight:600}
+    .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+    .fact{padding:8px 7px;background:rgba(255,255,255,.055);border:1px solid var(--line);border-radius:5px}.fact strong{display:block;font-size:13px}.fact span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .section-title{font-size:9px;color:var(--muted);letter-spacing:.13em;text-transform:uppercase;margin:9px 0 5px}
+    .mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+    button{min-height:38px;padding:8px 7px;border-radius:5px;border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--ink);cursor:pointer;font-size:11px;font-weight:650;transition:.18s}
+    button:hover,button:focus-visible{background:rgba(255,255,255,.14);outline:none;border-color:rgba(255,255,255,.3)}button.active{background:var(--accent);border-color:var(--accent);color:#241c0c}
+    .switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+    .switch-row button{min-height:32px;padding:5px 9px}.hint{font-size:11px;line-height:1.45;color:var(--muted);margin:9px 0 0}
+    #legend{right:16px;bottom:16px;width:220px;padding:12px 13px;border-radius:7px}.legend-title{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+    .legend-item{display:flex;align-items:center;gap:8px;font-size:11px;margin:6px 0}.dot{width:9px;height:9px;border-radius:50%;flex:none}.dot.coop{background:#a65f41}.dot.bsf{background:var(--blue)}.dot.azolla{background:var(--green)}
+    #status{left:16px;bottom:16px;padding:8px 11px;border-radius:5px;color:var(--muted);font-size:10px;pointer-events:none}
+    #crosshair{display:none;position:fixed;z-index:7;left:50%;top:50%;width:16px;height:16px;transform:translate(-50%,-50%);pointer-events:none}#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}#crosshair:before{width:16px;height:1px;top:7px}#crosshair:after{width:1px;height:16px;left:7px}
+    #lockHelp{display:none;position:fixed;z-index:9;left:50%;top:50%;transform:translate(-50%,-50%);width:min(390px,calc(100vw - 40px));padding:20px;text-align:center;border-radius:8px;background:rgba(20,25,21,.94);border:1px solid var(--line);cursor:pointer}#lockHelp strong{font-family:Georgia,serif;font-size:19px;display:block;margin-bottom:6px}#lockHelp span{font-size:11px;line-height:1.5;color:var(--muted)}
+    #tip{position:fixed;z-index:8;left:50%;bottom:20px;transform:translateX(-50%);padding:8px 11px;border-radius:5px;background:rgba(20,25,21,.88);font-size:11px;opacity:0;transition:.2s;pointer-events:none}#tip.show{opacity:1}
+    #error{display:none;inset:20px;padding:20px;background:#351e1a;border:1px solid #a85242;color:#ffd7ce;border-radius:8px}
+    @media(max-width:700px){#info{top:8px;left:8px;width:calc(100vw - 16px);padding:11px}h1{font-size:18px;margin-bottom:7px}.facts{margin-bottom:6px}.preset-grid button{font-size:9px;padding:5px 2px}.hint{display:none}#legend,#status{display:none}}
+  </style>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
+</head>
+<body>
+  <aside id="info" class="panel">
+    <div class="eyebrow">Visualisasi Denah Keseluruhan</div>
+    <h1>My Home · Rumah & Area Produksi</h1>
+    <div class="facts">
+      <div class="fact"><strong>2 ruang</strong><span>Bangunan</span></div>
+      <div class="fact"><strong>1 kolam</strong><span>Halaman</span></div>
+      <div class="fact"><strong>3 zona</strong><span>Produksi</span></div>
+    </div>
+    <div class="section-title">Mode navigasi</div>
+    <div class="mode-grid"><button id="orbitBtn" class="active">Orbit Mode</button><button id="walkBtn">Walk-In / FPS</button></div>
+    <div class="section-title">Sudut pandang</div>
+    <div class="preset-grid"><button id="siteBtn">Keseluruhan</button><button id="houseBtn">Rumah</button><button id="yardBtn">Gudang</button><button id="coopBtn">Kandang</button><button id="bsfBtn">Rak BSF</button><button id="azollaBtn">Azolla</button></div>
+    <div class="switch-row"><span>Atap transparan untuk inspeksi interior</span><button id="roofBtn" class="active">Atap 35%</button></div>
+    <p id="modeHint" class="hint">Drag untuk memutar · scroll untuk zoom · klik pintu untuk buka/tutup.</p>
+  </aside>
+  <aside id="legend" class="panel"><div class="legend-title">Elemen denah</div><div class="legend-item"><span class="dot coop"></span>Rumah utama & gudang</div><div class="legend-item"><span class="dot bsf"></span>Kolam, paving & lanskap</div><div class="legend-item"><span class="dot azolla"></span>Kandang, BSF & Azolla</div></aside>
+  <div id="status" class="panel">Memuat visualisasi…</div><div id="crosshair"></div><div id="tip">Klik pintu untuk buka / tutup</div>
+  <div id="lockHelp"><strong>Klik untuk mulai berjalan</strong><span>WASD bergerak · mouse melihat · Shift mempercepat · klik pintu · Esc melepas mouse</span></div>
+  <div id="error" class="panel"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+    const scene=new THREE.Scene();scene.background=new THREE.Color(0xbad9e9);scene.fog=new THREE.Fog(0xbad9e9,42,90);
+    const camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.05,140);camera.position.set(26,22,29);
+    const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;renderer.domElement.tabIndex=0;document.body.prepend(renderer.domElement);
+    const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(4,1,-6);orbit.enableDamping=true;orbit.dampingFactor=.06;orbit.minDistance=5;orbit.maxDistance=65;orbit.maxPolarAngle=Math.PI*.49;
+    const fps=new PointerLockControls(camera,document.body),clock=new THREE.Clock(),raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+    let mode='orbit',doorOpen=false,doorAngle=0,roofTransparent=true;
+
+    const mat={
+      ground:new THREE.MeshStandardMaterial({color:0x6f8c52,roughness:1}),floor:new THREE.MeshStandardMaterial({color:0x9a8566,roughness:1}),brick:new THREE.MeshStandardMaterial({color:0xa25e43,roughness:.92}),mortar:new THREE.MeshStandardMaterial({color:0xcab79f,roughness:1}),wood:new THREE.MeshStandardMaterial({color:0x60432d,roughness:.85}),steel:new THREE.MeshStandardMaterial({color:0x59635f,metalness:.48,roughness:.5}),zinc:new THREE.MeshStandardMaterial({color:0x73807b,metalness:.55,roughness:.42,transparent:true,opacity:.35,side:THREE.DoubleSide}),rack:new THREE.MeshStandardMaterial({color:0x3e4946,metalness:.55,roughness:.42}),blue:new THREE.MeshStandardMaterial({color:0x6eb5cf,transparent:true,opacity:.75,roughness:.32}),blueDark:new THREE.MeshStandardMaterial({color:0x326f86,roughness:.5}),tray:new THREE.MeshStandardMaterial({color:0x45554a,roughness:.72}),water:new THREE.MeshStandardMaterial({color:0x6aaa58,transparent:true,opacity:.83,roughness:.22}),leaf:new THREE.MeshStandardMaterial({color:0x79b94e,roughness:.7}),yellow:new THREE.MeshStandardMaterial({color:0xe6a82d,roughness:.58}),red:new THREE.MeshStandardMaterial({color:0xaa3728,roughness:.65}),white:new THREE.MeshStandardMaterial({color:0xe9e5d9,roughness:.76})
+    };
+    function addMesh(g,m,x=0,y=0,z=0,cast=true,receive=true,parent=scene){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=cast;o.receiveShadow=receive;parent.add(o);return o}
+    function box(w,h,d,m,x,y,z,parent=scene){return addMesh(new THREE.BoxGeometry(w,h,d),m,x,y,z,true,true,parent)}
+    addMesh(new THREE.PlaneGeometry(80,80),mat.ground,4,-.1,-5,false,true).rotation.x=-Math.PI/2;
+    // Access path around the three production zones.
+    box(8.2,.06,12.5,new THREE.MeshStandardMaterial({color:0x8e866f,roughness:1}),0,-.035,0);
+
+    // Whole-site context reconstructed from My-home.floorplan.json.
+    // Coordinates are shifted so Room 2 (the coop) stays at the scene origin.
+    const plaster=new THREE.MeshStandardMaterial({color:0xd8c8a8,roughness:.88});
+    const plasterDark=new THREE.MeshStandardMaterial({color:0xb8a789,roughness:.9});
+    const roofTile=new THREE.MeshStandardMaterial({color:0x68483b,roughness:.78,transparent:true,opacity:.38,side:THREE.DoubleSide});
+    const paving=new THREE.MeshStandardMaterial({color:0xaaa188,roughness:1});
+    const poolMat=new THREE.MeshStandardMaterial({color:0x55b7cf,transparent:true,opacity:.78,roughness:.2,metalness:.05});
+    const concrete=new THREE.MeshStandardMaterial({color:0x999b91,roughness:.95});
+
+    // Room 1 / main house: approximately 11.7 × 8.6 m from wall centerlines.
+    box(11.7,.15,8.6,plasterDark,1.7,.02,-14.3);
+    box(.2,3,8.6,plaster,-4.15,1.5,-14.3);box(.2,3,8.6,plaster,7.55,1.5,-14.3);box(11.7,3,.2,plaster,1.7,1.5,-18.6);
+    // Open entrance: doorway remains, only the door leaf is omitted.
+    box(5.47,3,.2,plaster,-1.415,1.5,-10);box(5.33,3,.2,plaster,4.885,1.5,-10);box(.9,.9,.2,plaster,1.77,2.55,-10);
+    box(.08,2.18,.26,mat.wood,1.28,1.09,-9.88);box(.08,2.18,.26,mat.wood,2.26,1.09,-9.88);box(1.06,.08,.26,mat.wood,1.77,2.14,-9.88);
+    const houseRun=4.7,houseRise=1.2,houseSlope=Math.hypot(houseRun,houseRise),houseAngle=Math.atan2(houseRise,houseRun);
+    const houseRoofA=box(12.2,.1,houseSlope,roofTile,1.7,3.58,-16.65);houseRoofA.rotation.x=-houseAngle;
+    const houseRoofB=box(12.2,.1,houseSlope,roofTile,1.7,3.58,-11.95);houseRoofB.rotation.x=houseAngle;
+    box(12.25,.1,.1,mat.steel,1.7,4.18,-14.3);
+    box(3.2,.08,1.25,paving,1.77,.08,-9.45);
+
+    // Gudang from the free wall segments, about 3.4 × 6.5 m.
+    box(3.4,.12,6.5,plasterDark,5.85,.01,-6.65);
+    // West wall has two open doorways based on the two doors in the floorplan.
+    box(.18,2.65,4.3,plaster,4.15,1.325,-6.76);box(.18,2.65,.31,plaster,4.15,1.325,-3.555);box(.18,2.65,.09,plaster,4.15,1.325,-9.855);
+    box(.18,.55,.9,plaster,4.15,2.375,-4.16);box(.18,.55,.9,plaster,4.15,2.375,-9.36);box(.18,2.65,6.5,plaster,7.55,1.325,-6.65);
+    box(3.4,2.65,.18,plaster,5.85,1.325,-3.4);box(3.4,2.65,.18,plaster,5.85,1.325,-9.9);
+    box(3.4,2.65,.14,plasterDark,5.85,1.325,-5.0);
+    box(3.75,.1,6.85,roofTile,5.85,2.72,-6.65);
+
+    // Door frames without leaves, plus visible warehouse storage.
+    for(const z of [-4.16,-9.36]){box(.24,2.16,.07,mat.steel,4.03,1.08,z-.49);box(.24,2.16,.07,mat.steel,4.03,1.08,z+.49);box(.24,.07,1.05,mat.steel,4.03,2.14,z)}
+    for(const z of [-7.8,-6.4,-5.65]){box(.48,.06,1.05,mat.rack,7.15,.45,z);box(.48,.06,1.05,mat.rack,7.15,1.05,z);box(.48,.06,1.05,mat.rack,7.15,1.65,z)}
+    const crateMat=new THREE.MeshStandardMaterial({color:0x9b6b3f,roughness:.9});
+    for(const [x,y,z] of [[5.1,.28,-8.1],[5.7,.28,-8.1],[5.4,.78,-8.1],[6.2,.28,-6.4],[6.75,.28,-6.4]])box(.5,.5,.55,crateMat,x,y,z);
+    const warehouseLight=new THREE.PointLight(0xffe5b0,1.8,7);warehouseLight.position.set(5.85,2.1,-6.65);scene.add(warehouseLight);
+
+
+    // Courtyard paving and the long connector path recorded in the plan.
+    box(8.1,.07,4.9,paving,0,.015,-7.45);box(1,.075,9.9,paving,3.55,.02,0);
+
+    // Pool 3.3 × 1.8 m.
+    box(3.5,.35,2,concrete,5.8,.08,-2.4);box(3.28,.12,1.78,poolMat,5.8,.24,-2.4);
+
+    function makeTree(x,z,scale=1,palm=false){
+      const trunk=addMesh(new THREE.CylinderGeometry(.14*scale,.21*scale,2.6*scale,9),new THREE.MeshStandardMaterial({color:0x795637,roughness:1}),x,1.3*scale,z);trunk.castShadow=true;
+      if(palm){for(let i=0;i<9;i++){const leaf=addMesh(new THREE.ConeGeometry(.18*scale,2.6*scale,5),new THREE.MeshStandardMaterial({color:0x3f7f42,roughness:.85}),x,2.8*scale,z);leaf.rotation.z=Math.PI/2.35;leaf.rotation.y=i*Math.PI*2/9}}
+      else{for(const [dx,dy,dz,s] of [[0,0,0,1],[.55,-.15,.2,.72],[-.5,-.1,-.25,.76],[.15,.35,-.4,.68]]){const crown=addMesh(new THREE.IcosahedronGeometry(1.05*scale*s,1),new THREE.MeshStandardMaterial({color:0x4f8848,roughness:1,flatShading:true}),x+dx*scale,2.75*scale+dy*scale,z+dz*scale);crown.castShadow=true}}
+    }
+    makeTree(8.4,-.8,1.45,true);makeTree(2.8,-7.4,1,false);makeTree(-3,-4.65,1,false);
+
+    // Outdoor table and firepit.
+    addMesh(new THREE.CylinderGeometry(.62,.62,.09,24),mat.wood,2.75,.78,-7.37);addMesh(new THREE.CylinderGeometry(.09,.12,.72,10),mat.steel,2.75,.38,-7.37);
+    addMesh(new THREE.CylinderGeometry(.62,.72,.25,16),new THREE.MeshStandardMaterial({color:0x4d4740,roughness:1}),-3.45,.18,-6.37);
+    addMesh(new THREE.ConeGeometry(.28,.55,9),new THREE.MeshStandardMaterial({color:0xe47c2d,emissive:0x7a2108,emissiveIntensity:.7}),-3.45,.55,-6.37);
+
+    // Boundary walls from the bwall objects; the west segment beside Azolla is added below as a metal fence.
+    function boundary(x,z,length,alongX=true){
+      box(alongX?length:.12,.45,alongX?.12:length,concrete,x,.225,z);
+      const count=Math.ceil(length/2);for(let i=0;i<=count;i++){const d=-length/2+i*length/count;box(.08,1.35,.08,mat.steel,x+(alongX?d:0),1.05,z+(alongX?0:d))}
+      for(const y of [.68,1.1,1.5])box(alongX?length:.045,.045,alongX?.045:length,mat.steel,x,y,z);
+    }
+    boundary(5.895,7.05,20,true);boundary(15.945,2.85,8.5,false);boundary(11.795,-1.45,8.4,true);boundary(7.545,-2.4,1.9,false);boundary(-4.15,-9.2,1.4,false);
+    // Main gate in the west boundary opening.
+    box(.12,2,.12,mat.steel,-4.1,1,-8.48);box(.12,2,.12,mat.steel,-4.1,1,-7.4);box(.08,1.65,1.0,mat.steel,-4.1,.95,-7.94);
+
+    // Main 5 × 10 m chicken coop.
+    box(5,.12,10,mat.floor,0,.04,0);
+    function brickWall(w,d,x,z){box(w,.6,d,mat.brick,x,.36,z);for(let y=.12;y<.6;y+=.12)box(w+.01,.012,d+.01,mat.mortar,x,y,z);}
+    brickWall(5,.16,0,-5);brickWall(.16,10,-2.5,0);brickWall(.16,10,2.5,0);brickWall(1.75,.16,-1.625,5);brickWall(1.75,.16,1.625,5);
+    const posts=[[-2.5,-5],[2.5,-5],[-2.5,0],[2.5,0],[-2.5,5],[2.5,5],[-.75,5],[.75,5]];posts.forEach(([x,z])=>box(.14,2.5,.14,mat.wood,x,1.25,z));
+    box(5.15,.14,.14,mat.wood,0,2.45,-5);box(5.15,.14,.14,mat.wood,0,2.45,5);box(.14,.14,10.15,mat.wood,-2.5,2.45,0);box(.14,.14,10.15,mat.wood,2.5,2.45,0);
+    function gridTexture(){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.strokeStyle='rgba(38,47,43,.88)';g.lineWidth=2;for(let p=0;p<=128;p+=16){g.beginPath();g.moveTo(p,0);g.lineTo(p,128);g.stroke();g.beginPath();g.moveTo(0,p);g.lineTo(128,p);g.stroke()}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t}
+    const baseGrid=gridTexture();
+    function wire(w,h,x,y,z,ry=0,rx=5,rz=3,parent=scene){const t=baseGrid.clone();t.needsUpdate=true;t.repeat.set(rx,rz);const m=new THREE.MeshStandardMaterial({map:t,transparent:true,opacity:.72,side:THREE.DoubleSide,alphaTest:.1,roughness:.8});const o=addMesh(new THREE.PlaneGeometry(w,h),m,x,y,z,false,false,parent);o.rotation.y=ry;return o}
+    wire(4.82,1.72,0,1.55,-5.01,0,10,3);wire(9.82,1.72,-2.51,1.55,0,Math.PI/2,20,3);wire(9.82,1.72,2.51,1.55,0,Math.PI/2,20,3);wire(1.6,1.72,-1.65,1.55,5.01,0,4,3);wire(1.6,1.72,1.65,1.55,5.01,0,4,3);
+    const roofGroup=new THREE.Group();scene.add(roofGroup);const rise=.72,run=2.72,roofAngle=Math.atan2(rise,run),roofSlope=Math.hypot(rise,run);
+    const lr=box(roofSlope,.08,10.55,mat.zinc,-run/2,2.78,0,roofGroup);lr.rotation.z=roofAngle;const rr=box(roofSlope,.08,10.55,mat.zinc,run/2,2.78,0,roofGroup);rr.rotation.z=-roofAngle;box(.1,.1,10.65,mat.steel,0,3.14,0,roofGroup);
+    for(let z=-5;z<=5.01;z+=.35){const a=box(roofSlope,.02,.016,mat.steel,-run/2,2.83,z,roofGroup);a.rotation.z=roofAngle;const b=box(roofSlope,.02,.016,mat.steel,run/2,2.83,z,roofGroup);b.rotation.z=-roofAngle}
+
+    // Interactive door, centered on front side.
+    const doorPivot=new THREE.Group();doorPivot.position.set(-.7,0,5.055);scene.add(doorPivot);const doorParts=[];
+    function doorBox(w,h,d,m,x,y,z){const o=box(w,h,d,m,x,y,z,doorPivot);o.userData.door=true;doorParts.push(o);return o}
+    doorBox(1.4,.58,.09,mat.brick,.7,.35,0);doorBox(.08,2.08,.1,mat.wood,.04,1.12,0);doorBox(.08,2.08,.1,mat.wood,1.36,1.12,0);doorBox(1.4,.08,.1,mat.wood,.7,2.12,0);doorBox(1.4,.08,.1,mat.wood,.7,.64,0);
+    const dg=wire(1.24,1.38,0,0,0,0,3,3);scene.remove(dg);dg.position.set(.7,1.38,0);dg.userData.door=true;doorPivot.add(dg);doorParts.push(dg);doorBox(.06,.13,.13,new THREE.MeshStandardMaterial({color:0xd2b66b,metalness:.7,roughness:.25}),1.22,1.2,-.08);
+
+    // Interior: hanging feeders, automatic drinkers, roosts and low-poly chickens.
+    function feeder(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);addMesh(new THREE.CylinderGeometry(.008,.008,1.0,6),mat.steel,0,1.98,0,true,true,g);addMesh(new THREE.CylinderGeometry(.18,.3,.46,16),mat.yellow,0,1.25,0,true,true,g);addMesh(new THREE.CylinderGeometry(.4,.4,.08,20),mat.red,0,1,0,true,true,g)}
+    [-3.2,-1.1,1.1,3.2].forEach(z=>feeder(-.7,z));
+    function drinker(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);addMesh(new THREE.CylinderGeometry(.2,.27,.45,16),mat.white,0,.8,0,true,true,g);addMesh(new THREE.CylinderGeometry(.32,.32,.06,20),mat.blue,0,.55,0,true,true,g);addMesh(new THREE.CylinderGeometry(.022,.022,1.7,8),mat.steel,0,1.65,0,true,true,g)}
+    [-2.4,0,2.4].forEach(z=>drinker(.75,z));
+    [-3.8,-4.3].forEach((z,i)=>{box(3.5,.09,.12,mat.wood,0,.72+i*.44,z);box(.1,.72+i*.44,.1,mat.wood,-1.5,.36+i*.22,z);box(.1,.72+i*.44,.1,mat.wood,1.5,.36+i*.22,z)});
+    function chicken(x,z,c=0xd4bd91,r=0){const g=new THREE.Group();g.position.set(x,.14,z);g.rotation.y=r;scene.add(g);const fm=new THREE.MeshStandardMaterial({color:c,roughness:.9,flatShading:true});const body=addMesh(new THREE.SphereGeometry(.27,8,6),fm,0,.28,0,true,true,g);body.scale.set(1,.8,1.25);addMesh(new THREE.SphereGeometry(.15,7,5),fm,0,.51,-.23,true,true,g);const beak=addMesh(new THREE.ConeGeometry(.065,.17,4),mat.yellow,0,.51,-.42,true,true,g);beak.rotation.x=-Math.PI/2;addMesh(new THREE.ConeGeometry(.05,.13,5),mat.red,0,.68,-.21,true,true,g)}
+    [[-1.3,-2.2,0xd6c49e,.4],[.2,-1.4,0x8a5b3c,-1],[1.3,.3,0xe5ddca,2],[-1.4,1.7,0x69452f,-.3],[.4,3.1,0xcaa66e,1.6],[1.45,2,0xe0d3b4,-2.2],[-.4,.2,0xa87952,.9]].forEach(v=>chicken(...v));
+
+    // Shared four-level rack builder; 50 cm vertical module.
+    const rackLevels=[.35,.85,1.35,1.85];
+    function rackFrame(x,length){const g=new THREE.Group();g.position.x=x;scene.add(g);[-.27,.27].forEach(dx=>[-length/2,length/2].forEach(z=>box(.055,2.18,.055,mat.rack,dx,1.09,z,g)));for(let z=-length/2;z<=length/2+.01;z+=2) [-.27,.27].forEach(dx=>box(.05,2.18,.05,mat.rack,dx,1.09,Math.min(z,length/2),g));rackLevels.forEach(y=>{box(.6,.055,length,mat.rack,0,y-.12,0,g);for(let z=-length/2;z<=length/2;z+=1)box(.6,.035,.045,mat.rack,0,y-.08,z,g)});return g}
+
+    // BSF rack: 0.6 × 10 m, four levels, horizontal gallon modules.
+    const bsfX=3.05,bsfRack=rackFrame(bsfX,10);
+    function gallon(parent,y,z){const g=new THREE.Group();g.position.set(0,y,z);parent.add(g);const body=addMesh(new THREE.CylinderGeometry(.175,.19,.42,14),mat.blue,0,0,0,true,true,g);body.rotation.z=Math.PI/2;const shoulder=addMesh(new THREE.CylinderGeometry(.105,.175,.12,14),mat.blue,.27,0,0,true,true,g);shoulder.rotation.z=Math.PI/2;const neck=addMesh(new THREE.CylinderGeometry(.07,.07,.09,12),mat.blueDark,.37,0,0,true,true,g);neck.rotation.z=Math.PI/2;box(.12,.035,.18,mat.blueDark,-.02,.19,0,g)}
+    rackLevels.forEach(y=>{for(let z=-4.55;z<=4.56;z+=.7)gallon(bsfRack,y,z)});
+
+    // Azolla rack: same 0.6 m / four-level frame, length follows fence side: 10.7 m.
+    const azollaX=-3.7,azollaRack=rackFrame(azollaX,10.7);
+    rackLevels.forEach(y=>{for(let z=-4.85;z<=4.86;z+=1.05){const depth=Math.min(1.0,5.35-z);box(.54,.12,depth,mat.tray,0,y,z+depth/2-.5,azollaRack);box(.49,.015,Math.max(.05,depth-.08),mat.water,0,y+.067,z+depth/2-.5,azollaRack);for(let i=0;i<5;i++)addMesh(new THREE.SphereGeometry(.025+Math.random()*.018,5,4),mat.leaf,(Math.random()-.5)*.4,y+.085,z+depth/2-.5+(Math.random()-.5)*Math.max(.04,depth-.12),false,false,azollaRack)}});
+
+    // Boundary fence directly behind the Azolla rack.
+    const fenceX=-4.1;for(let z=-7.25;z<=7.06;z+=1.5)box(.1,1.55,.1,mat.steel,fenceX,.775,Math.min(z,7.05));for(let y=.25;y<=1.5;y+=.25)box(.055,.055,14.45,mat.steel,fenceX,y,-.175);for(let z=-7.25;z<=7.06;z+=.3)box(.04,1.25,.04,mat.steel,fenceX,.82,Math.min(z,7.05));
+
+    // Labels and dimension guides.
+    function label(text,pos,color='#ffffff',scale=2.4){const c=document.createElement('canvas');c.width=512;c.height=96;const x=c.getContext('2d');x.fillStyle='rgba(22,28,24,.84)';x.roundRect(8,8,496,80,12);x.fill();x.strokeStyle=color;x.lineWidth=3;x.stroke();x.fillStyle='#fff';x.font='600 28px Segoe UI';x.textAlign='center';x.fillText(text,256,59);const t=new THREE.CanvasTexture(c);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));s.position.copy(pos);s.scale.set(scale,.45*scale,1);scene.add(s);return s}
+    label('RUMAH UTAMA · ROOM 1',new THREE.Vector3(1.7,4.75,-14.3),'#d8c8a8',2.5);label('GUDANG',new THREE.Vector3(5.85,3.35,-6.65),'#d8c8a8',1.55);label('KOLAM',new THREE.Vector3(5.8,1.05,-2.4),'#75bad0',1.35);
+    label('KANDANG AYAM · 5 × 10 m',new THREE.Vector3(0,3.65,-.2),'#d28762',2.25);label('BSF · 4 TINGKAT',new THREE.Vector3(3.05,2.65,0),'#75bad0',1.8);label('AZOLLA · 4 TINGKAT',new THREE.Vector3(-3.7,2.65,0),'#91bf73',1.9);
+    function dim(a,b,text,pos){const geo=new THREE.BufferGeometry().setFromPoints([a,b]);scene.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color:0xf0b94e})));label(text,pos,'#eeb84c',1.45)}
+    dim(new THREE.Vector3(-2.5,.03,5.65),new THREE.Vector3(2.5,.03,5.65),'5 meter',new THREE.Vector3(0,.32,5.65));dim(new THREE.Vector3(3.75,.03,-5),new THREE.Vector3(3.75,.03,5),'10 meter',new THREE.Vector3(3.75,.32,0));
+
+    scene.add(new THREE.HemisphereLight(0xeaf6ff,0x52603b,1.25));const sun=new THREE.DirectionalLight(0xfff0cc,3.2);sun.position.set(-16,24,15);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-32;sun.shadow.camera.right=32;sun.shadow.camera.top=32;sun.shadow.camera.bottom=-32;sun.shadow.camera.near=.5;sun.shadow.camera.far=70;sun.shadow.bias=-.0004;scene.add(sun);
+
+    const $=id=>document.getElementById(id),orbitBtn=$('orbitBtn'),walkBtn=$('walkBtn'),lockHelp=$('lockHelp'),crosshair=$('crosshair'),modeHint=$('modeHint'),tip=$('tip'),status=$('status');
+    function setMode(next,pos,rotY=Math.PI){if(fps.isLocked)fps.unlock();mode=next;orbit.enabled=next==='orbit';orbitBtn.classList.toggle('active',next==='orbit');walkBtn.classList.toggle('active',next==='walk');crosshair.style.display=next==='walk'?'block':'none';lockHelp.style.display=next==='walk'?'block':'none';if(next==='walk'){camera.position.copy(pos||new THREE.Vector3(0,1.6,7));camera.rotation.set(0,rotY,0);modeHint.textContent='WASD bergerak · mouse melihat · Shift mempercepat · klik pintu · Esc melepas mouse.'}else modeHint.textContent='Drag untuk memutar · scroll untuk zoom · klik pintu untuk buka/tutup.'}
+    orbitBtn.onclick=()=>setMode('orbit');walkBtn.onclick=()=>setMode('walk');lockHelp.onclick=()=>fps.lock();fps.addEventListener('lock',()=>lockHelp.style.display='none');fps.addEventListener('unlock',()=>{if(mode==='walk')lockHelp.style.display='block'});
+    function preset(pos,target){setMode('orbit');camera.position.copy(pos);orbit.target.copy(target);orbit.update()}
+    $('siteBtn').onclick=()=>preset(new THREE.Vector3(26,22,29),new THREE.Vector3(4,1,-6));$('houseBtn').onclick=()=>preset(new THREE.Vector3(-11,10,-4),new THREE.Vector3(1.7,1.4,-14.3));$('yardBtn').onclick=()=>preset(new THREE.Vector3(0,11,-7),new THREE.Vector3(5.85,.8,-6.65));$('coopBtn').onclick=()=>preset(new THREE.Vector3(7,4.4,8),new THREE.Vector3(0,1.1,0));$('bsfBtn').onclick=()=>preset(new THREE.Vector3(8.5,3.5,9),new THREE.Vector3(3.05,1.05,0));$('azollaBtn').onclick=()=>preset(new THREE.Vector3(-.8,3.2,8.7),new THREE.Vector3(-3.7,1.05,0));
+    $('roofBtn').onclick=()=>{roofTransparent=!roofTransparent;mat.zinc.opacity=roofTransparent?.35:1;roofTile.opacity=roofTransparent?.38:.92;$('roofBtn').textContent=roofTransparent?'Atap 35%':'Atap Penuh';$('roofBtn').classList.toggle('active',roofTransparent);mat.zinc.needsUpdate=true;roofTile.needsUpdate=true};
+    const keys={};addEventListener('keydown',e=>{keys[e.code]=true;if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault()});addEventListener('keyup',e=>keys[e.code]=false);
+    function doorHit(cx,cy,center=false){pointer.set(center?0:cx/innerWidth*2-1,center?0:-cy/innerHeight*2+1);raycaster.setFromCamera(pointer,camera);const h=raycaster.intersectObjects(doorParts,true);return h.length&&h[0].distance<16}
+    renderer.domElement.addEventListener('pointermove',e=>{if(mode!=='orbit')return;const hit=doorHit(e.clientX,e.clientY);renderer.domElement.style.cursor=hit?'pointer':'grab';tip.classList.toggle('show',!!hit)});renderer.domElement.addEventListener('click',e=>{if(mode==='orbit'&&doorHit(e.clientX,e.clientY)||mode==='walk'&&fps.isLocked&&doorHit(0,0,true)){doorOpen=!doorOpen;status.textContent=doorOpen?'Pintu kandang dibuka':'Pintu kandang ditutup'}});
+    addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+    status.textContent='Siap · visualisasi keseluruhan My Home berdasarkan floorplan';
+    // Internal camera API used for deterministic POV video recording.
+    window.povTour={
+      prepare(){if(fps.isLocked)fps.unlock();mode='tour';orbit.enabled=false;doorOpen=true;mat.zinc.opacity=.22;roofTile.opacity=.28;mat.zinc.needsUpdate=true;roofTile.needsUpdate=true},
+      setCamera(px,py,pz,tx,ty,tz){camera.position.set(px,py,pz);camera.lookAt(tx,ty,tz)},
+      restore(){mode='orbit';orbit.enabled=true;doorOpen=false;mat.zinc.opacity=.35;roofTile.opacity=.38;orbit.update()}
+    };
+    function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);doorAngle=THREE.MathUtils.damp(doorAngle,doorOpen?-Math.PI*.48:0,6,dt);doorPivot.rotation.y=doorAngle;if(mode==='orbit')orbit.update();if(mode==='walk'&&fps.isLocked){let f=(keys.KeyW?1:0)-(keys.KeyS?1:0),r=(keys.KeyD?1:0)-(keys.KeyA?1:0);if(f||r){const n=Math.hypot(f,r);f/=n;r/=n;const speed=(keys.ShiftLeft||keys.ShiftRight)?4.5:2.4;fps.moveForward(f*speed*dt);fps.moveRight(r*speed*dt);camera.position.y=1.6;camera.position.x=THREE.MathUtils.clamp(camera.position.x,-25,25);camera.position.z=THREE.MathUtils.clamp(camera.position.z,-25,20)}}renderer.render(scene,camera)}animate();
+  </script>
+  <script>addEventListener('error',e=>{const b=document.getElementById('error');b.style.display='block';b.textContent='Gagal memuat visualisasi: '+e.message+' — pastikan koneksi internet tersedia untuk CDN Three.js.'})</script>
+</body>
+</html>
