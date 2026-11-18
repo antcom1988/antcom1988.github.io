@@ -10,7 +10,12 @@
     *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#b9d8e9}body{font-family:"Segoe UI",Arial,sans-serif;color:var(--ink)}
     canvas{display:block;width:100%;height:100%;outline:none}button{font:inherit}
     .panel{position:fixed;z-index:10;background:var(--panel);border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.24);backdrop-filter:blur(8px)}
-    #info{top:16px;left:16px;width:min(355px,calc(100vw - 32px));padding:16px;border-radius:8px}
+    #info{top:16px;left:16px;width:min(355px,calc(100vw - 32px));padding:16px;border-radius:8px;transition:width .2s ease,height .2s ease,padding .2s ease}
+    #panelToggle{position:absolute;top:9px;right:9px;width:34px;min-height:34px;padding:0;border-radius:5px;font-size:20px;line-height:1;z-index:2}
+    #info h1{padding-right:38px}
+    #info.minimized{width:52px;height:52px;padding:8px}
+    #info.minimized>:not(#panelToggle){display:none!important}
+    #info.minimized #panelToggle{top:8px;right:8px}
     .eyebrow{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
     h1{font-family:Georgia,serif;font-size:22px;line-height:1.12;margin:5px 0 11px;font-weight:600}
     .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
@@ -28,12 +33,13 @@
     #lockHelp{display:none;position:fixed;z-index:9;left:50%;top:50%;transform:translate(-50%,-50%);width:min(390px,calc(100vw - 40px));padding:20px;text-align:center;border-radius:8px;background:rgba(20,25,21,.94);border:1px solid var(--line);cursor:pointer}#lockHelp strong{font-family:Georgia,serif;font-size:19px;display:block;margin-bottom:6px}#lockHelp span{font-size:11px;line-height:1.5;color:var(--muted)}
     #tip{position:fixed;z-index:8;left:50%;bottom:20px;transform:translateX(-50%);padding:8px 11px;border-radius:5px;background:rgba(20,25,21,.88);font-size:11px;opacity:0;transition:.2s;pointer-events:none}#tip.show{opacity:1}
     #error{display:none;inset:20px;padding:20px;background:#351e1a;border:1px solid #a85242;color:#ffd7ce;border-radius:8px}
-    @media(max-width:700px){#info{top:8px;left:8px;width:calc(100vw - 16px);padding:11px}h1{font-size:18px;margin-bottom:7px}.facts{margin-bottom:6px}.preset-grid button{font-size:9px;padding:5px 2px}.hint{display:none}#legend,#status{display:none}}
+    @media(max-width:700px){#info{top:8px;left:8px;width:calc(100vw - 16px);padding:11px}#info.minimized{width:52px;height:52px;padding:8px}h1{font-size:18px;margin-bottom:7px}.facts{margin-bottom:6px}.preset-grid button{font-size:9px;padding:5px 2px}.hint{display:none}#legend,#status{display:none}}
   </style>
   <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
 </head>
 <body>
   <aside id="info" class="panel">
+    <button id="panelToggle" type="button" aria-label="Minimalkan panel" aria-expanded="true" title="Minimalkan panel">−</button>
     <div class="eyebrow">Visualisasi Denah Keseluruhan</div>
     <h1>My Home · Rumah & Area Produksi</h1>
     <div class="facts">
@@ -195,6 +201,8 @@
     scene.add(new THREE.HemisphereLight(0xeaf6ff,0x52603b,1.25));const sun=new THREE.DirectionalLight(0xfff0cc,3.2);sun.position.set(-16,24,15);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-32;sun.shadow.camera.right=32;sun.shadow.camera.top=32;sun.shadow.camera.bottom=-32;sun.shadow.camera.near=.5;sun.shadow.camera.far=70;sun.shadow.bias=-.0004;scene.add(sun);
 
     const $=id=>document.getElementById(id),orbitBtn=$('orbitBtn'),walkBtn=$('walkBtn'),lockHelp=$('lockHelp'),crosshair=$('crosshair'),modeHint=$('modeHint'),tip=$('tip'),status=$('status');
+    const infoPanel=$('info'),panelToggle=$('panelToggle');
+    panelToggle.onclick=()=>{const minimized=infoPanel.classList.toggle('minimized');panelToggle.textContent=minimized?'☰':'−';panelToggle.setAttribute('aria-expanded',String(!minimized));panelToggle.setAttribute('aria-label',minimized?'Buka panel':'Minimalkan panel');panelToggle.title=minimized?'Buka panel':'Minimalkan panel'};
     function setMode(next,pos,rotY=Math.PI){if(fps.isLocked)fps.unlock();mode=next;orbit.enabled=next==='orbit';orbitBtn.classList.toggle('active',next==='orbit');walkBtn.classList.toggle('active',next==='walk');crosshair.style.display=next==='walk'?'block':'none';lockHelp.style.display=next==='walk'?'block':'none';if(next==='walk'){camera.position.copy(pos||new THREE.Vector3(0,1.6,7));camera.rotation.set(0,rotY,0);modeHint.textContent='WASD bergerak · mouse melihat · Shift mempercepat · klik pintu · Esc melepas mouse.'}else modeHint.textContent='Drag untuk memutar · scroll untuk zoom · klik pintu untuk buka/tutup.'}
     orbitBtn.onclick=()=>setMode('orbit');walkBtn.onclick=()=>setMode('walk');lockHelp.onclick=()=>fps.lock();fps.addEventListener('lock',()=>lockHelp.style.display='none');fps.addEventListener('unlock',()=>{if(mode==='walk')lockHelp.style.display='block'});
     function preset(pos,target){setMode('orbit');camera.position.copy(pos);orbit.target.copy(target);orbit.update()}
