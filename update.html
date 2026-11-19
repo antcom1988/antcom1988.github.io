@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>My Home v2 — Visualisasi 3D dari Floorplan Terbaru</title>
+<link rel="icon" href="data:,"/>
+<style>
+:root{--ink:#f5f1e7;--muted:#c6c8bd;--panel:rgba(21,27,23,.92);--line:rgba(255,255,255,.14);--accent:#eeb84c}
+*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#b9d8e9}body{font-family:"Segoe UI",Arial,sans-serif;color:var(--ink)}
+canvas{display:block;width:100%;height:100%;outline:none}button{font:inherit}
+.panel{position:fixed;z-index:10;background:var(--panel);border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.24);backdrop-filter:blur(8px)}
+#info{top:16px;left:16px;width:min(355px,calc(100vw - 32px));padding:16px;border-radius:8px;transition:width .2s,height .2s,padding .2s}
+#panelToggle{position:absolute;top:9px;right:9px;width:34px;min-height:34px;padding:0;border-radius:5px;font-size:20px;line-height:1;z-index:2}
+#info h1{padding-right:38px}
+#info.minimized{width:52px;height:52px;padding:8px}
+#info.minimized>:not(#panelToggle){display:none!important}
+#info.minimized #panelToggle{top:8px;right:8px}
+.eyebrow{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+h1{font-family:Georgia,serif;font-size:21px;line-height:1.12;margin:5px 0 11px;font-weight:600}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.fact{padding:8px 7px;background:rgba(255,255,255,.055);border:1px solid var(--line);border-radius:5px}.fact strong{display:block;font-size:13px}.fact span{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.section-title{font-size:9px;color:var(--muted);letter-spacing:.13em;text-transform:uppercase;margin:9px 0 5px}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+button{min-height:38px;padding:8px 7px;border-radius:5px;border:1px solid var(--line);background:rgba(255,255,255,.07);color:var(--ink);cursor:pointer;font-size:11px;font-weight:650;transition:.18s}
+button:hover,button:focus-visible{background:rgba(255,255,255,.14);outline:none;border-color:rgba(255,255,255,.3)}button.active{background:var(--accent);border-color:var(--accent);color:#241c0c}
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.switch-row button{min-height:32px;padding:5px 9px}.hint{font-size:11px;line-height:1.45;color:var(--muted);margin:9px 0 0}
+#legend{right:16px;bottom:16px;width:230px;padding:12px 13px;border-radius:7px}.legend-title{font-size:10px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:11px;margin:6px 0}.dot{width:9px;height:9px;border-radius:50%;flex:none}.dot.coop{background:#a65f41}.dot.bsf{background:#75bad0}.dot.azolla{background:#91bf73}
+#status{left:16px;bottom:16px;padding:8px 11px;border-radius:5px;color:var(--muted);font-size:10px;pointer-events:none}
+#crosshair{display:none;position:fixed;z-index:7;left:50%;top:50%;width:16px;height:16px;transform:translate(-50%,-50%);pointer-events:none}#crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;box-shadow:0 0 2px #000}#crosshair:before{width:16px;height:1px;top:7px}#crosshair:after{width:1px;height:16px;left:7px}
+#lockHelp{display:none;position:fixed;z-index:9;left:50%;top:50%;transform:translate(-50%,-50%);width:min(390px,calc(100vw - 40px));padding:20px;text-align:center;border-radius:8px;background:rgba(20,25,21,.94);border:1px solid var(--line);cursor:pointer}#lockHelp strong{font-family:Georgia,serif;font-size:19px;display:block;margin-bottom:6px}#lockHelp span{font-size:11px;line-height:1.5;color:var(--muted)}
+#tip{position:fixed;z-index:8;left:50%;bottom:20px;transform:translateX(-50%);padding:8px 11px;border-radius:5px;background:rgba(20,25,21,.88);font-size:11px;opacity:0;transition:.2s;pointer-events:none}#tip.show{opacity:1}
+#error{display:none;inset:20px;padding:20px;background:#351e1a;border:1px solid #a85242;color:#ffd7ce;border-radius:8px}
+@media(max-width:700px){#info{top:8px;left:8px;width:calc(100vw - 16px);padding:11px}#info.minimized{width:52px;height:52px;padding:8px}h1{font-size:18px;margin-bottom:7px}.facts{margin-bottom:6px}.preset-grid button{font-size:9px;padding:5px 2px}.hint{display:none}#legend,#status{display:none}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"}}</script>
+</head>
+<body>
+<aside id="info" class="panel">
+<button id="panelToggle" type="button" aria-label="Minimalkan panel" aria-expanded="true" title="Minimalkan panel">−</button>
+<div class="eyebrow">Dibangun dari My-home.floorplan.json</div>
+<h1>My Home · Rumah, Gudang & Kandang 4×6</h1>
+<div class="facts">
+<div class="fact"><strong>4 × 6 m</strong><span>Kandang</span></div>
+<div class="fact"><strong>0,6 × 6 m</strong><span>Rak BSF</span></div>
+<div class="fact"><strong>0,6 × 10,7 m</strong><span>Azolla pagar</span></div>
+</div>
+<div class="section-title">Mode navigasi</div>
+<div class="mode-grid"><button id="orbitBtn" class="active">Orbit Mode</button><button id="walkBtn">Walk-In / FPS</button></div>
+<div class="section-title">Sudut pandang</div>
+<div class="preset-grid"><button id="siteBtn">Keseluruhan</button><button id="houseBtn">Rumah</button><button id="gudangBtn">Gudang</button><button id="coopBtn">Kandang</button><button id="bsfBtn">Rak BSF</button><button id="azollaBtn">Azolla</button></div>
+<div class="switch-row"><span>Atap transparan untuk inspeksi interior</span><button id="roofBtn" class="active">Atap 35%</button></div>
+<p id="modeHint" class="hint">Drag untuk memutar · scroll untuk zoom · klik pintu kandang untuk buka/tutup.</p>
+</aside>
+<aside id="legend" class="panel"><div class="legend-title">Elemen denah</div><div class="legend-item"><span class="dot coop"></span>Rumah utama & gudang</div><div class="legend-item"><span class="dot bsf"></span>Kandang 4×6 + rak BSF 6 m</div><div class="legend-item"><span class="dot azolla"></span>Rak Azolla 6 m & 10,7 m</div></aside>
+<div id="status" class="panel">Memuat visualisasi…</div><div id="crosshair"></div><div id="tip">Klik pintu untuk buka / tutup</div>
+<div id="lockHelp"><strong>Klik untuk mulai berjalan</strong><span>WASD bergerak · mouse melihat · Shift mempercepat · klik pintu kandang · Esc melepas mouse</span></div>
+<div id="error" class="panel"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {PointerLockControls} from 'three/addons/controls/PointerLockControls.js';
+
+// ---- Data langsung dari My-home.floorplan.json (mm → m) ----
+const PLAN={
+wallH:3.0,doorH:2.1,
+walls:[
+["5zp1z6o6",-11400,-7526.511,300,-7526.511,200,"house"],
+["htcfeluz",300,-7526.511,300,1073.489,200,"house"],
+["vowzfopp",300,1073.489,-11400,1073.489,200,"house"],
+["yftmxste",-11400,1073.489,-11400,-7426.511,200,"house"],
+["db89hr82",-11400,-7488.314,-11400,-7526.511,200,"house"],
+["y7xo27j2",-11400,-7426.511,-11400,-7488.314,200,"house"],
+["c4y8d0ub",300,1173.489,300,7673.489,200,"gudang"],
+["phzpqzsp",400,7673.489,-3100,7673.489,200,"gudang"],
+["5a3i3kxu",-3100,7673.489,-3100,1073.489,200,"gudang"],
+["b3p6lrup",-1500,6073.489,300,6073.489,200,"gudang"],
+["f5kmckv6",300,6073.489,-3100,6073.489,200,"gudang"],
+["nx9wxg8c",-4900,6073.489,-8900,6073.489,200,"coop"],
+["5ngx287x",-8900,6073.489,-8900,12073.489,200,"coop"],
+["eu4007p3",-8900,12073.489,-4900,12073.489,200,"coop"],
+["umy0b45s",-4900,12073.489,-4900,6073.489,200,"coop"]
+],
+doors:[
+["jv9eww38","vowzfopp",5780,900],
+["y9aucrri","5a3i3kxu",760,900],
+["9t8spswe","5a3i3kxu",5960,900],
+["ul3lpk6c","nx9wxg8c",1960,900]
+],
+furn:[
+["qvgze7la","bwall",-11355.279,10923.489,100,14500,0],
+["9q3j38cw","bwall",-1355.279,18123.489,20000,100,0],
+["3cmqq5qh","bwall",8694.721,13923.489,100,8500,0],
+["bpvb7ua5","bwall",4544.721,9623.489,8400,100,0],
+["7xgrloz8","bwall",294.721,8673.489,100,1900,0],
+["tf1ac5xn","gate",-11360,3173.489,1000,80,270],
+["0qyxkqeu","bwall",-11400,1873.489,100,1400,0],
+["chm5lmca","pool",-1450,8673.489,3300,1800,0],
+["u4feqi4x","surf",-7250,3623.489,8100,4900,0],
+["vfs81tqp","palm",1150,10273.489,5000,5000,0,7000],
+["3tajaabr","tree",-4450,3673.489,2500,2500,0],
+["4w4ivcjt","tree",-10250,6423.489,2500,2500,0],
+["yueo7cvv","round",-4500,3700,1000,1000,0],
+["tubf8q6m","firepit",-10700,4700,1100,1100,0],
+["zby1qk9o","surf",-3700,9123.489,1000,6000,0],
+["q7imlqct","azolla",-10950,12523.489,10700,600,270],
+["pm2r0vef","bsf",-4500,9123.489,6000,600,270],
+["o046ny9j","surf",-6900,12623.489,1000,7400,90],
+["cw9r8t3p","azolla",-9300,9023.489,6000,600,270],
+["kc4o0qha","surf",-10150,9073.489,1000,6000,0]
+]};
+
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xbad9e9);scene.fog=new THREE.Fog(0xbad9e9,45,95);
+const camera=new THREE.PerspectiveCamera(54,innerWidth/innerHeight,.05,160);camera.position.set(24,26,38);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;renderer.domElement.tabIndex=0;document.body.prepend(renderer.domElement);
+const orbit=new OrbitControls(camera,renderer.domElement);orbit.target.set(-1.5,0,5);orbit.enableDamping=true;orbit.dampingFactor=.06;orbit.minDistance=4;orbit.maxDistance=80;orbit.maxPolarAngle=Math.PI*.49;
+const fps=new PointerLockControls(camera,document.body),clock=new THREE.Clock(),raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+let mode='orbit',doorOpen=false,doorAngle=0,roofTransparent=true;
+
+const M={
+ground:new THREE.MeshStandardMaterial({color:0x6f8c52,roughness:1}),
+plaster:new THREE.MeshStandardMaterial({color:0xd8c8a8,roughness:.88}),
+plasterDark:new THREE.MeshStandardMaterial({color:0xb8a789,roughness:.9}),
+brick:new THREE.MeshStandardMaterial({color:0xa25e43,roughness:.92}),
+mortar:new THREE.MeshStandardMaterial({color:0xcab79f,roughness:1}),
+wood:new THREE.MeshStandardMaterial({color:0x60432d,roughness:.85}),
+steel:new THREE.MeshStandardMaterial({color:0x59635f,metalness:.48,roughness:.5}),
+zinc:new THREE.MeshStandardMaterial({color:0x73807b,metalness:.55,roughness:.42,transparent:true,opacity:.35,side:THREE.DoubleSide}),
+roofTile:new THREE.MeshStandardMaterial({color:0x68483b,roughness:.78,transparent:true,opacity:.38,side:THREE.DoubleSide}),
+paving:new THREE.MeshStandardMaterial({color:0xaaa188,roughness:1}),
+concrete:new THREE.MeshStandardMaterial({color:0x999b91,roughness:.95}),
+pool:new THREE.MeshStandardMaterial({color:0x55b7cf,transparent:true,opacity:.78,roughness:.2}),
+rack:new THREE.MeshStandardMaterial({color:0x3e4946,metalness:.55,roughness:.42}),
+blue:new THREE.MeshStandardMaterial({color:0x6eb5cf,transparent:true,opacity:.75,roughness:.32}),
+blueDark:new THREE.MeshStandardMaterial({color:0x326f86,roughness:.5}),
+tray:new THREE.MeshStandardMaterial({color:0x45554a,roughness:.72}),
+water:new THREE.MeshStandardMaterial({color:0x6aaa58,transparent:true,opacity:.85,roughness:.22}),
+leaf:new THREE.MeshStandardMaterial({color:0x79b94e,roughness:.7}),
+yellow:new THREE.MeshStandardMaterial({color:0xe6a82d,roughness:.58}),
+red:new THREE.MeshStandardMaterial({color:0xaa3728,roughness:.65}),
+white:new THREE.MeshStandardMaterial({color:0xe9e5d9,roughness:.76}),
+crate:new THREE.MeshStandardMaterial({color:0x9b6b3f,roughness:.9})
+};
+function add(g,m,x=0,y=0,z=0,parent=scene,cast=true){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=cast;o.receiveShadow=true;parent.add(o);return o}
+function box(w,h,d,m,x,y,z,parent=scene){return add(new THREE.BoxGeometry(w,h,d),m,x,y,z,parent)}
+add(new THREE.PlaneGeometry(95,95),M.ground,-1,-.1,5,scene,false).rotation.x=-Math.PI/2;
+
+// ---- Walls with door openings (no door leaves except interactive coop door) ----
+const wallById={};PLAN.walls.forEach(w=>wallById[w[0]]=w);
+const doorsByWall={};PLAN.doors.forEach(d=>{(doorsByWall[d[1]]=doorsByWall[d[1]]||[]).push(d)});
+function gridTexture(){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d');g.strokeStyle='rgba(38,47,43,.88)';g.lineWidth=2;for(let p=0;p<=128;p+=16){g.beginPath();g.moveTo(p,0);g.lineTo(p,128);g.stroke();g.beginPath();g.moveTo(0,p);g.lineTo(128,p);g.stroke()}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t}
+const baseGrid=gridTexture();
+function wire(w,h,x,y,z,ry,rx,rz,parent=scene){const t=baseGrid.clone();t.needsUpdate=true;t.repeat.set(rx,rz);const m=new THREE.MeshStandardMaterial({map:t,transparent:true,opacity:.72,side:THREE.DoubleSide,alphaTest:.1,roughness:.8});const o=add(new THREE.PlaneGeometry(w,h),m,x,y,z,parent,false);o.rotation.y=ry;return o}
+function solidRun(kind,len,cx,cz,ang,H,t){
+  const g=new THREE.Group();g.position.set(cx,0,cz);g.rotation.y=-ang;scene.add(g);
+  if(kind==='coop'){
+    box(len,.6,t,M.brick,0,.3,0,g);
+    for(let y=.12;y<.6;y+=.12)box(len+.01,.012,t+.01,M.mortar,0,y,0,g);
+    wire(len,H-.62,0,.6+(H-.62)/2,0,0,Math.max(2,Math.round(len/.5)),3,g);
+  }else{
+    box(len,H,t,M.plaster,0,H/2,0,g);
+  }
+  return g;
+}
+PLAN.walls.forEach(w=>{
+  const[id,x1,y1,x2,y2,t,kind]=w;
+  const ax=x1/1000,az=y1/1000,bx=x2/1000,bz=y2/1000;
+  const dx=bx-ax,dz=bz-az,len=Math.hypot(dx,dz);if(len<.05)return;
+  const ang=Math.atan2(dz,dx),ux=dx/len,uz=dz/len;
+  const H=kind==='coop'?2.5:(kind==='gudang'?2.65:PLAN.wallH);
+  const tm=t/1000;
+  const ds=(doorsByWall[id]||[]).map(d=>({c:d[2]/1000,w:d[3]/1000})).sort((a,b)=>a.c-b.c);
+  let cursor=0;const runs=[];
+  ds.forEach(d=>{const s=Math.max(0,d.c-d.w/2),e=Math.min(len,d.c+d.w/2);if(s>cursor)runs.push([cursor,s]);
+    // lintel above opening
+    const lx=ax+ux*d.c,lz=az+uz*d.c;
+    if(kind==='coop'){wire(d.w,H-PLAN.doorH,lx,PLAN.doorH+(H-PLAN.doorH)/2,lz,-ang,2,1)}
+    else box(d.w,H-PLAN.doorH,tm,M.plaster,lx,PLAN.doorH+(H-PLAN.doorH)/2,lz).rotation.y=-ang;
+    // door frame
+    const fg=new THREE.Group();fg.position.set(lx,0,lz);fg.rotation.y=-ang;scene.add(fg);
+    box(.07,PLAN.doorH,tm+.08,M.wood,-d.w/2,PLAN.doorH/2,0,fg);box(.07,PLAN.doorH,tm+.08,M.wood,d.w/2,PLAN.doorH/2,0,fg);box(d.w+.14,.07,tm+.08,M.wood,0,PLAN.doorH,0,fg);
+    cursor=e;});
+  if(cursor<len)runs.push([cursor,len]);
+  runs.forEach(([s,e])=>{const l=e-s;if(l<.02)return;const c=(s+e)/2;solidRun(kind,l,ax+ux*c,az+uz*c,ang,H,t/1000)});
+});
+
+// ---- Floors ----
+box(11.7,.12,8.6,M.plasterDark,-5.55,.02,-3.2265);           // rumah
+box(3.4,.12,6.5,M.plasterDark,-1.4,.02,4.4235);              // gudang
+box(4,.12,6,new THREE.MeshStandardMaterial({color:0x9a8566,roughness:1}),-6.9,.04,9.0735); // kandang
+// husk texture in coop
+const husk=new THREE.MeshStandardMaterial({color:0xb9a171,roughness:1});
+for(let i=0;i<110;i++){const s=box(.045,.012,.15+Math.random()*.12,husk,-6.9+(Math.random()-.5)*3.7,.11,9.0735+(Math.random()-.5)*5.7);s.rotation.y=Math.random()*Math.PI;s.castShadow=false}
+
+// ---- Roofs ----
+const houseCx=-5.55,houseCz=-3.2265,hRun=4.5,hRise=1.2,hSlope=Math.hypot(hRun,hRise),hAng=Math.atan2(hRise,hRun);
+const hr1=box(12.1,.09,hSlope,M.roofTile,houseCx,3.55,houseCz-hRun/2);hr1.rotation.x=-hAng;
+const hr2=box(12.1,.09,hSlope,M.roofTile,houseCx,3.55,houseCz+hRun/2);hr2.rotation.x=hAng;
+box(12.15,.09,.09,M.steel,houseCx,4.15,houseCz);
+box(3.8,.09,6.9,M.roofTile,-1.4,2.72,4.4235); // gudang flat
+const cRun=2.2,cRise=.6,cSlope=Math.hypot(cRun,cRise),cAng=Math.atan2(cRise,cRun);
+const cr1=box(cSlope,.07,6.4,M.zinc,-6.9-cRun/2,2.78,9.0735);cr1.rotation.z=cAng;
+const cr2=box(cSlope,.07,6.4,M.zinc,-6.9+cRun/2,2.78,9.0735);cr2.rotation.z=-cAng;
+box(.09,.09,6.5,M.steel,-6.9,3.08,9.0735);
+for(let z=6.1;z<=12.05;z+=.35){const a=box(cSlope,.02,.016,M.steel,-6.9-cRun/2,2.83,z);a.rotation.z=cAng;const b=box(cSlope,.02,.016,M.steel,-6.9+cRun/2,2.83,z);b.rotation.z=-cAng}
+// coop posts
+[[-8.9,6.0735],[-4.9,6.0735],[-8.9,12.0735],[-4.9,12.0735],[-8.9,9.0735],[-4.9,9.0735],[-7.31,6.0735],[-6.41,6.0735]].forEach(([x,z])=>box(.13,2.5,.13,M.wood,x,1.25,z));
+
+// ---- Interactive coop door (south wall, center x=-6.86) ----
+const doorPivot=new THREE.Group();doorPivot.position.set(-7.31,0,6.0735);scene.add(doorPivot);const doorParts=[];
+function dBox(w,h,d,m,x,y,z){const o=box(w,h,d,m,x,y,z,doorPivot);o.userData.door=true;doorParts.push(o);return o}
+dBox(.9,.58,.09,M.brick,.45,.35,0);dBox(.07,2.05,.09,M.wood,.035,1.1,0);dBox(.07,2.05,.09,M.wood,.865,1.1,0);dBox(.9,.07,.09,M.wood,.45,2.09,0);dBox(.9,.07,.09,M.wood,.45,.62,0);
+const dg=wire(.76,1.36,0,0,0,0,2,3);scene.remove(dg);dg.position.set(.45,1.36,0);dg.userData.door=true;doorPivot.add(dg);doorParts.push(dg);
+dBox(.05,.12,.12,new THREE.MeshStandardMaterial({color:0xd2b66b,metalness:.7,roughness:.25}),.78,1.18,-.07);
+
+// ---- Coop interior ----
+function feeder(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);add(new THREE.CylinderGeometry(.008,.008,1,6),M.steel,0,1.98,0,g);add(new THREE.CylinderGeometry(.16,.27,.42,14),M.yellow,0,1.25,0,g);add(new THREE.CylinderGeometry(.36,.36,.07,18),M.red,0,1,0,g)}
+[-1.9,-.6,.7,2].forEach(dz=>feeder(-7.5,9.0735+dz));
+function drinker(x,z){const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);add(new THREE.CylinderGeometry(.18,.24,.4,14),M.white,0,.78,0,g);add(new THREE.CylinderGeometry(.29,.29,.05,18),M.blue,0,.55,0,g);add(new THREE.CylinderGeometry(.02,.02,1.6,8),M.steel,0,1.6,0,g)}
+[-1.4,.9].forEach(dz=>drinker(-6.2,9.0735+dz));
+[11.1,11.55].forEach((z,i)=>{box(3.2,.08,.11,M.wood,-6.9,.7+i*.42,z);box(.09,.7+i*.42,.09,M.wood,-8.2,.35+i*.21,z);box(.09,.7+i*.42,.09,M.wood,-5.6,.35+i*.21,z)});
+function chicken(x,z,c,r){const g=new THREE.Group();g.position.set(x,.14,z);g.rotation.y=r;scene.add(g);const fm=new THREE.MeshStandardMaterial({color:c,roughness:.9,flatShading:true});const b=add(new THREE.SphereGeometry(.25,8,6),fm,0,.27,0,g);b.scale.set(1,.8,1.25);add(new THREE.SphereGeometry(.14,7,5),fm,0,.49,-.21,g);const bk=add(new THREE.ConeGeometry(.06,.16,4),M.yellow,0,.49,-.39,g);bk.rotation.x=-Math.PI/2;add(new THREE.ConeGeometry(.045,.12,5),M.red,0,.65,-.19,g)}
+[[-7.9,7.6,0xd6c49e,.4],[-6.4,8.2,0x8a5b3c,-1],[-5.6,9.6,0xe5ddca,2],[-7.8,10.2,0x69452f,-.3],[-6.2,10.6,0xcaa66e,1.6],[-5.7,7.2,0xe0d3b4,-2.2]].forEach(v=>chicken(...v));
+
+// ---- Racks: 4 levels × 50 cm ----
+const levels=[.35,.85,1.35,1.85];
+function rack(x,zc,length,type){
+  const g=new THREE.Group();g.position.set(x,0,zc);scene.add(g);
+  const ends=[-length/2,length/2];
+  [-.27,.27].forEach(dx=>{ends.forEach(z=>box(.055,2.18,.055,M.rack,dx,1.09,z,g));for(let z=-length/2+2;z<length/2;z+=2)box(.05,2.18,.05,M.rack,dx,1.09,z,g)});
+  levels.forEach(y=>{box(.6,.05,length,M.rack,0,y-.12,0,g);for(let z=-length/2;z<=length/2;z+=1)box(.6,.03,.04,M.rack,0,y-.08,z,g)});
+  if(type==='bsf'){
+    levels.forEach(y=>{for(let z=-length/2+.4;z<=length/2-.3;z+=.7){const b=add(new THREE.CylinderGeometry(.16,.175,.4,12),M.blue,0,y,z,g);b.rotation.z=Math.PI/2;const sh=add(new THREE.CylinderGeometry(.095,.16,.11,12),M.blue,.25,y,z,g);sh.rotation.z=Math.PI/2;const nk=add(new THREE.CylinderGeometry(.06,.06,.08,10),M.blueDark,.34,y,z,g);nk.rotation.z=Math.PI/2;box(.11,.03,.16,M.blueDark,-.02,y+.18,z,g)}});
+  }else{
+    levels.forEach(y=>{for(let z=-length/2+.55;z<=length/2-.4;z+=1.05){box(.54,.12,1,M.tray,0,y,z,g);box(.49,.015,.92,M.water,0,y+.067,z,g);for(let i=0;i<5;i++)add(new THREE.SphereGeometry(.025+Math.random()*.018,5,4),M.leaf,(Math.random()-.5)*.4,y+.085,z+(Math.random()-.5)*.8,g,false)}});
+  }
+  return g;
+}
+
+// ---- Furniture from plan ----
+function fence(x,z,w,h){
+  const alongX=w>=h,L=Math.max(w,h)/1000;
+  box(alongX?L:.12,.45,alongX?.12:L,M.concrete,x,.225,z);
+  const n=Math.max(2,Math.ceil(L/2));for(let i=0;i<=n;i++){const d=-L/2+i*L/n;box(.08,1.35,.08,M.steel,x+(alongX?d:0),1.05,z+(alongX?0:d))}
+  for(const y of[.68,1.1,1.5])box(alongX?L:.045,.045,alongX?.045:L,M.steel,x,y,z);
+}
+function tree(x,z,s,palm){
+  add(new THREE.CylinderGeometry(.14*s,.21*s,2.6*s,9),new THREE.MeshStandardMaterial({color:0x795637,roughness:1}),x,1.3*s,z);
+  if(palm){for(let i=0;i<9;i++){const l=add(new THREE.ConeGeometry(.18*s,2.6*s,5),new THREE.MeshStandardMaterial({color:0x3f7f42,roughness:.85}),x,2.8*s,z);l.rotation.z=Math.PI/2.35;l.rotation.y=i*Math.PI*2/9}}
+  else{[[0,0,0,1],[.55,-.15,.2,.72],[-.5,-.1,-.25,.76],[.15,.35,-.4,.68]].forEach(([dx,dy,dz,k])=>add(new THREE.IcosahedronGeometry(1.05*s*k,1),new THREE.MeshStandardMaterial({color:0x4f8848,roughness:1,flatShading:true}),x+dx*s,2.75*s+dy*s,z+dz*s))}
+}
+PLAN.furn.forEach(f=>{
+  const[id,kind,x,y,w,h,rot,ht]=f;const X=x/1000,Z=y/1000,W=w/1000,H=h/1000;
+  if(kind==='bwall')fence(X,Z,w,h);
+  else if(kind==='gate'){box(.12,2,.12,M.steel,X,1,Z-.55);box(.12,2,.12,M.steel,X,1,Z+.55);box(.08,1.65,1,M.steel,X,.95,Z)}
+  else if(kind==='pool'){box(W+.2,.35,H+.2,M.concrete,X,.08,Z);box(W,.12,H,M.pool,X,.24,Z)}
+  else if(kind==='surf'){const rw=(rot===90||rot===270)?H:W,rd=(rot===90||rot===270)?W:H;box(rw,.06,rd,M.paving,X,.015,Z)}
+  else if(kind==='palm')tree(X,Z,(ht||7000)/7000*1.45,true);
+  else if(kind==='tree')tree(X,Z,1,false);
+  else if(kind==='round'){add(new THREE.CylinderGeometry(.5,.5,.08,22),M.wood,X,.76,Z);add(new THREE.CylinderGeometry(.08,.11,.7,10),M.steel,X,.37,Z)}
+  else if(kind==='firepit'){add(new THREE.CylinderGeometry(.55,.65,.25,16),new THREE.MeshStandardMaterial({color:0x4d4740,roughness:1}),X,.18,Z);add(new THREE.ConeGeometry(.26,.5,9),new THREE.MeshStandardMaterial({color:0xe47c2d,emissive:0x7a2108,emissiveIntensity:.7}),X,.52,Z)}
+  else if(kind==='bsf')rack(X,Z,(rot===270||rot===90)?W:H,'bsf');
+  else if(kind==='azolla')rack(X,Z,(rot===270||rot===90)?W:H,'azolla');
+});
+// gudang interior: shelves + crates + light
+for(const z of[2.2,3.6,5.2]){box(.48,.06,1.05,M.rack,-2.75,.45,z);box(.48,.06,1.05,M.rack,-2.75,1.05,z);box(.48,.06,1.05,M.rack,-2.75,1.65,z)}
+[[-1.9,.28,2.1],[-1.3,.28,2.1],[-1.6,.78,2.1],[-.8,.28,3.8],[-.25,.28,3.8]].forEach(([x,y,z])=>box(.5,.5,.55,M.crate,x,y,z));
+const gl=new THREE.PointLight(0xffe5b0,1.8,7);gl.position.set(-1.4,2.1,4.4);scene.add(gl);
+
+// ---- Labels & dimensions ----
+function label(text,pos,color,scale){const c=document.createElement('canvas');c.width=512;c.height=96;const x=c.getContext('2d');x.fillStyle='rgba(22,28,24,.84)';x.beginPath();x.roundRect(8,8,496,80,12);x.fill();x.strokeStyle=color;x.lineWidth=3;x.stroke();x.fillStyle='#fff';x.font='600 28px Segoe UI';x.textAlign='center';x.fillText(text,256,59);const t=new THREE.CanvasTexture(c);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false}));s.position.copy(pos);s.scale.set(scale,.45*scale,1);scene.add(s)}
+label('RUMAH UTAMA',new THREE.Vector3(-5.55,4.7,-3.23),'#d8c8a8',2.3);
+label('GUDANG',new THREE.Vector3(-1.4,3.3,4.42),'#d8c8a8',1.5);
+label('KOLAM',new THREE.Vector3(-1.45,1,8.673),'#75bad0',1.3);
+label('KANDANG AYAM · 4 × 6 m',new THREE.Vector3(-6.9,3.6,9.07),'#d28762',2.3);
+label('BSF · 4 TINGKAT · 6 m',new THREE.Vector3(-4.5,2.6,12.6),'#75bad0',1.9);
+label('AZOLLA · 6 m',new THREE.Vector3(-9.3,2.6,12.6),'#91bf73',1.6);
+label('AZOLLA · 10,7 m',new THREE.Vector3(-10.95,2.6,18.1),'#91bf73',1.9);
+function dim(a,b,text,pos){scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([a,b]),new THREE.LineBasicMaterial({color:0xf0b94e})));label(text,pos,'#eeb84c',1.3)}
+dim(new THREE.Vector3(-8.9,.03,5.55),new THREE.Vector3(-4.9,.03,5.55),'4 meter',new THREE.Vector3(-6.9,.3,5.55));
+dim(new THREE.Vector3(-4.15,.03,6.0735),new THREE.Vector3(-4.15,.03,12.0735),'6 meter',new THREE.Vector3(-4.15,.3,9.07));
+
+// ---- Light ----
+scene.add(new THREE.HemisphereLight(0xeaf6ff,0x52603b,1.25));
+const sun=new THREE.DirectionalLight(0xfff0cc,3.1);sun.position.set(-18,26,22);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);sun.shadow.camera.left=-28;sun.shadow.camera.right=28;sun.shadow.camera.top=30;sun.shadow.camera.bottom=-22;sun.shadow.camera.near=.5;sun.shadow.camera.far=80;sun.shadow.bias=-.0004;scene.add(sun);
+
+// ---- UI ----
+const $=id=>document.getElementById(id),orbitBtn=$('orbitBtn'),walkBtn=$('walkBtn'),lockHelp=$('lockHelp'),crosshair=$('crosshair'),modeHint=$('modeHint'),tip=$('tip'),status=$('status');
+const infoPanel=$('info'),panelToggle=$('panelToggle');
+panelToggle.onclick=()=>{const m=infoPanel.classList.toggle('minimized');panelToggle.textContent=m?'☰':'−';panelToggle.setAttribute('aria-expanded',String(!m));panelToggle.setAttribute('aria-label',m?'Buka panel':'Minimalkan panel');panelToggle.title=m?'Buka panel':'Minimalkan panel'};
+function setMode(next,pos,rotY){if(fps.isLocked)fps.unlock();mode=next;orbit.enabled=next==='orbit';orbitBtn.classList.toggle('active',next==='orbit');walkBtn.classList.toggle('active',next==='walk');crosshair.style.display=next==='walk'?'block':'none';lockHelp.style.display=next==='walk'?'block':'none';if(next==='walk'){camera.position.copy(pos||new THREE.Vector3(-6.86,1.6,4.4));camera.rotation.set(0,rotY===undefined?Math.PI:rotY,0);modeHint.textContent='WASD bergerak · mouse melihat · Shift mempercepat · klik pintu kandang · Esc melepas mouse.'}else modeHint.textContent='Drag untuk memutar · scroll untuk zoom · klik pintu kandang untuk buka/tutup.'}
+orbitBtn.onclick=()=>setMode('orbit');walkBtn.onclick=()=>setMode('walk');lockHelp.onclick=()=>fps.lock();
+fps.addEventListener('lock',()=>lockHelp.style.display='none');fps.addEventListener('unlock',()=>{if(mode==='walk')lockHelp.style.display='block'});
+function preset(pos,target){setMode('orbit');camera.position.copy(pos);orbit.target.copy(target);orbit.update()}
+$('siteBtn').onclick=()=>preset(new THREE.Vector3(24,26,38),new THREE.Vector3(-1.5,0,5));
+$('houseBtn').onclick=()=>preset(new THREE.Vector3(-14,9,4),new THREE.Vector3(-5.55,1.4,-3.23));
+$('gudangBtn').onclick=()=>preset(new THREE.Vector3(-7,10,4.4),new THREE.Vector3(-1.4,.8,4.42));
+$('coopBtn').onclick=()=>preset(new THREE.Vector3(-6.86,2.2,3.2),new THREE.Vector3(-6.9,1.2,9.07));
+$('bsfBtn').onclick=()=>preset(new THREE.Vector3(-1.6,3,13),new THREE.Vector3(-4.5,1.05,9.12));
+$('azollaBtn').onclick=()=>preset(new THREE.Vector3(-10.15,2.8,13.8),new THREE.Vector3(-10.15,1,7.5));
+$('roofBtn').onclick=()=>{roofTransparent=!roofTransparent;M.zinc.opacity=roofTransparent?.35:1;M.roofTile.opacity=roofTransparent?.38:.92;$('roofBtn').textContent=roofTransparent?'Atap 35%':'Atap Penuh';$('roofBtn').classList.toggle('active',roofTransparent);M.zinc.needsUpdate=true;M.roofTile.needsUpdate=true};
+const keys={};addEventListener('keydown',e=>{keys[e.code]=true;if(['KeyW','KeyA','KeyS','KeyD','ShiftLeft','ShiftRight'].includes(e.code))e.preventDefault()});addEventListener('keyup',e=>keys[e.code]=false);
+function doorHit(cx,cy,center=false){pointer.set(center?0:cx/innerWidth*2-1,center?0:-cy/innerHeight*2+1);raycaster.setFromCamera(pointer,camera);const h=raycaster.intersectObjects(doorParts,true);return h.length&&h[0].distance<16}
+renderer.domElement.addEventListener('pointermove',e=>{if(mode!=='orbit')return;const hit=doorHit(e.clientX,e.clientY);renderer.domElement.style.cursor=hit?'pointer':'grab';tip.classList.toggle('show',!!hit)});
+renderer.domElement.addEventListener('click',e=>{if(mode==='orbit'&&doorHit(e.clientX,e.clientY)||mode==='walk'&&fps.isLocked&&doorHit(0,0,true)){doorOpen=!doorOpen;status.textContent=doorOpen?'Pintu kandang dibuka':'Pintu kandang ditutup'}});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+status.textContent='Siap · denah terbaru: kandang 4×6 m, rak BSF 6 m, Azolla 6 m + 10,7 m';
+window.povTour={prepare(){if(fps.isLocked)fps.unlock();mode='tour';orbit.enabled=false;doorOpen=true;M.zinc.opacity=.22;M.roofTile.opacity=.28},setCamera(px,py,pz,tx,ty,tz){camera.position.set(px,py,pz);camera.lookAt(tx,ty,tz)},restore(){mode='orbit';orbit.enabled=true;doorOpen=false;M.zinc.opacity=.35;M.roofTile.opacity=.38;orbit.update()}};
+window.sceneDebug={camera,scene,V3:THREE.Vector3,doorWorld:new THREE.Vector3(-6.86,1.1,6.0735),projectDoor(){const v=this.doorWorld.clone().project(camera);return{x:(v.x+1)/2*innerWidth,y:(1-v.y)/2*innerHeight}}};
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.05);doorAngle=THREE.MathUtils.damp(doorAngle,doorOpen?Math.PI*.48:0,6,dt);doorPivot.rotation.y=doorAngle;if(mode==='orbit')orbit.update();if(mode==='walk'&&fps.isLocked){let f=(keys.KeyW?1:0)-(keys.KeyS?1:0),r=(keys.KeyD?1:0)-(keys.KeyA?1:0);if(f||r){const n=Math.hypot(f,r);f/=n;r/=n;const sp=(keys.ShiftLeft||keys.ShiftRight)?4.5:2.4;fps.moveForward(f*sp*dt);fps.moveRight(r*sp*dt);camera.position.y=1.6;camera.position.x=THREE.MathUtils.clamp(camera.position.x,-14,11);camera.position.z=THREE.MathUtils.clamp(camera.position.z,-10,20)}}renderer.render(scene,camera)}
+animate();
+</script>
+<script>addEventListener('error',e=>{const b=document.getElementById('error');b.style.display='block';b.textContent='Gagal memuat visualisasi: '+e.message+' — pastikan koneksi internet tersedia untuk CDN Three.js.'})</script>
+</body>
+</html>
